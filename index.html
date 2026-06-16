@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Etiquetas ML Express</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f4f5f2;
+        color: #202124;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 18px 12px 28px;
+      }
+
+      main {
+        width: min(620px, 100%);
+        margin: 0 auto;
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: 1.55rem;
+        line-height: 1.1;
+      }
+
+      p {
+        margin: 0;
+        color: #596168;
+        line-height: 1.4;
+      }
+
+      .panel,
+      .mode {
+        margin-top: 14px;
+        background: #ffffff;
+        border: 1px solid #d7d9d2;
+        border-radius: 8px;
+        padding: 14px;
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
+      }
+
+      .tabs {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      button,
+      .download {
+        width: 100%;
+        min-height: 46px;
+        border: 0;
+        border-radius: 8px;
+        padding: 10px 14px;
+        font: inherit;
+        font-weight: 750;
+        text-align: center;
+        text-decoration: none;
+      }
+
+      button {
+        background: #ffe600;
+        color: #252525;
+      }
+
+      button.secondary {
+        background: #edf0f2;
+      }
+
+      button.active {
+        outline: 3px solid #3483fa;
+      }
+
+      button:disabled {
+        opacity: 0.55;
+      }
+
+      label {
+        display: block;
+        margin-top: 12px;
+        font-weight: 700;
+      }
+
+      input[type="file"],
+      input[type="number"] {
+        width: 100%;
+        min-height: 44px;
+        margin-top: 7px;
+        border: 1px solid #c6cac4;
+        border-radius: 8px;
+        padding: 10px;
+        font: inherit;
+        background: #fbfbfa;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .hint {
+        margin-top: 8px;
+        font-size: 0.92rem;
+      }
+
+      .status {
+        min-height: 24px;
+        margin-top: 12px;
+        font-weight: 700;
+        overflow-wrap: anywhere;
+      }
+
+      .download {
+        display: block;
+        margin-top: 10px;
+        background: #3483fa;
+        color: #ffffff;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      @media (min-width: 560px) {
+        .tabs {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Etiquetas ML Express</h1>
+      <p>Version web para celular. Los PDFs se procesan en este navegador.</p>
+
+      <section class="panel">
+        <div class="tabs">
+          <button id="tabSimple" class="active" type="button">Preparar 1 etiqueta</button>
+          <button id="tabDouble" class="secondary" type="button">Juntar 2 envios</button>
+        </div>
+      </section>
+
+      <section id="modeSimple" class="mode">
+        <h2>Preparar 1 etiqueta</h2>
+        <p class="hint">Genera A4 horizontal con la etiqueta al lado izquierdo.</p>
+
+        <label for="simplePdf">PDF de Mercado Libre</label>
+        <input id="simplePdf" type="file" accept="application/pdf,.pdf" />
+
+        <div class="grid">
+          <label>
+            Margen izquierdo
+            <input id="simpleLeftMargin" type="number" min="0" step="1" value="20" />
+          </label>
+          <label>
+            Margen superior
+            <input id="simpleTopMargin" type="number" min="0" step="1" value="20" />
+          </label>
+        </div>
+
+        <button id="processSimple" type="button">Generar PDF</button>
+        <div id="simpleStatus" class="status"></div>
+        <div id="simpleResult"></div>
+      </section>
+
+      <section id="modeDouble" class="mode hidden">
+        <h2>Juntar 2 envios</h2>
+        <p class="hint">Genera A4 horizontal con dos etiquetas y su producto/cantidad.</p>
+
+        <label for="doublePdfs">Seleccionar exactamente 2 PDFs</label>
+        <input id="doublePdfs" type="file" accept="application/pdf,.pdf" multiple />
+
+        <button id="processDouble" type="button">Generar hoja doble</button>
+        <div id="doubleStatus" class="status"></div>
+        <div id="doubleResult"></div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script type="module">
+      import * as pdfjs from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs";
+
+      pdfjs.GlobalWorkerOptions.workerSrc =
+        "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
+
+      const A4_WIDTH = 842;
+      const A4_HEIGHT = 595;
+      const CROP_LEFT = 0;
+      const CROP_BOTTOM = 0;
+      const CROP_RIGHT = 421;
+      const SIMPLE_SCALE = 1.0;
+      const DOUBLE_SCALE = 0.76;
+      const DOUBLE_GAP = 16;
+      const DOUBLE_TOP_MARGIN = 20;
+      const DOUBLE_SIDE_MARGIN = 20;
+      const TEXT_GAP = 8;
+      const TEXT_SIZE = 8.5;
+      const TEXT_HEIGHT = 62;
+      const PRODUCT_MARKER =
+        "Despacha tu producto cuanto antes ¡No te relajes! Tu comprador lo está esperando.";
+
+      let simpleCounter = readCounter("simpleCounter");
+      let doubleCounter = readCounter("doubleCounter");
+
+      const tabSimple = document.querySelector("#tabSimple");
+      const tabDouble = document.querySelector("#tabDouble");
+      const modeSimple = document.querySelector("#modeSimple");
+      const modeDouble = document.querySelector("#modeDouble");
+
+      tabSimple.addEventListener("click", () => showMode("simple"));
+      tabDouble.addEventListener("click", () => showMode("double"));
+      document.querySelector("#processSimple").addEventListener("click", processSimple);
+      document.querySelector("#processDouble").addEventListener("click", processDouble);
+
+      function showMode(mode) {
+        const isSimple = mode === "simple";
+        modeSimple.classList.toggle("hidden", !isSimple);
+        modeDouble.classList.toggle("hidden", isSimple);
+        tabSimple.classList.toggle("active", isSimple);
+        tabDouble.classList.toggle("active", !isSimple);
+        tabSimple.classList.toggle("secondary", !isSimple);
+        tabDouble.classList.toggle("secondary", isSimple);
+      }
+
+      async function processSimple() {
+        const input = document.querySelector("#simplePdf");
+        const status = document.querySelector("#simpleStatus");
+        const result = document.querySelector("#simpleResult");
+        const file = input.files && input.files[0];
+
+        if (!file) {
+          status.textContent = "Elegi un PDF.";
+          return;
+        }
+
+        setBusy("#processSimple", true);
+        result.innerHTML = "";
+        status.textContent = "Procesando...";
+
+        try {
+          const bytes = await prepareSimplePdf(file);
+          const outputName = `${simpleCounter}-izquierda_${baseName(file.name)}.pdf`;
+          simpleCounter += 1;
+          writeCounter("simpleCounter", simpleCounter);
+          addResult(result, outputName, bytes);
+          status.textContent = `PDF generado: ${outputName}`;
+        } catch (error) {
+          status.textContent = `Error: ${error.message}`;
+        } finally {
+          setBusy("#processSimple", false);
+        }
+      }
+
+      async function processDouble() {
+        const input = document.querySelector("#doublePdfs");
+        const status = document.querySelector("#doubleStatus");
+        const result = document.querySelector("#doubleResult");
+        const files = Array.from(input.files || []);
+
+        if (files.length !== 2) {
+          status.textContent = "Selecciona exactamente 2 PDFs.";
+          return;
+        }
+
+        setBusy("#processDouble", true);
+        result.innerHTML = "";
+        status.textContent = "Procesando...";
+
+        try {
+          const bytes = await prepareDoublePdf(files[0], files[1]);
+          const outputName = `${doubleCounter}-etiquetas_dobles_lista.pdf`;
+          doubleCounter += 1;
+          writeCounter("doubleCounter", doubleCounter);
+          addResult(result, outputName, bytes);
+          status.textContent = `PDF generado: ${outputName}`;
+        } catch (error) {
+          status.textContent = `Error: ${error.message}`;
+        } finally {
+          setBusy("#processDouble", false);
+        }
+      }
+
+      async function prepareSimplePdf(file) {
+        const leftMargin = numberValue("#simpleLeftMargin", 20);
+        const topMargin = numberValue("#simpleTopMargin", 20);
+        const sourceBytes = await file.arrayBuffer();
+        const sourcePdf = await PDFLib.PDFDocument.load(sourceBytes);
+
+        if (sourcePdf.getPageCount() < 1) {
+          throw new Error(`${file.name} no tiene paginas.`);
+        }
+
+        const sourcePage = sourcePdf.getPage(0);
+        const cropTop = sourcePage.getHeight();
+        const outputPdf = await PDFLib.PDFDocument.create();
+        const outputPage = outputPdf.addPage([A4_WIDTH, A4_HEIGHT]);
+
+        const embeddedPage = await outputPdf.embedPage(sourcePage, {
+          left: CROP_LEFT,
+          bottom: CROP_BOTTOM,
+          right: CROP_RIGHT,
+          top: cropTop,
+        });
+
+        outputPage.drawPage(embeddedPage, {
+          x: leftMargin,
+          y: A4_HEIGHT - topMargin - cropTop * SIMPLE_SCALE,
+          width: CROP_RIGHT * SIMPLE_SCALE,
+          height: cropTop * SIMPLE_SCALE,
+        });
+
+        return outputPdf.save();
+      }
+
+      async function prepareDoublePdf(file1, file2) {
+        const envio1 = await readShipment(file1);
+        const envio2 = await readShipment(file2);
+        const outputPdf = await PDFLib.PDFDocument.create();
+        const outputPage = outputPdf.addPage([A4_WIDTH, A4_HEIGHT]);
+        const font = await outputPdf.embedFont(PDFLib.StandardFonts.Helvetica);
+        const columnWidth = (A4_WIDTH - 2 * DOUBLE_SIDE_MARGIN - DOUBLE_GAP) / 2;
+
+        await drawShipment(outputPdf, outputPage, envio1, DOUBLE_SIDE_MARGIN, columnWidth, font);
+        await drawShipment(
+          outputPdf,
+          outputPage,
+          envio2,
+          DOUBLE_SIDE_MARGIN + columnWidth + DOUBLE_GAP,
+          columnWidth,
+          font,
+        );
+
+        return outputPdf.save();
+      }
+
+      async function readShipment(file) {
+        const bytes = await file.arrayBuffer();
+        const sourcePdf = await PDFLib.PDFDocument.load(bytes);
+
+        if (sourcePdf.getPageCount() < 2) {
+          throw new Error(`${file.name} debe tener al menos 2 paginas.`);
+        }
+
+        const text = await extractPageText(bytes, 2);
+        const { producto, cantidad } = extractProductData(text);
+        return {
+          file,
+          sourcePdf,
+          sourcePage: sourcePdf.getPage(0),
+          producto,
+          cantidad,
+        };
+      }
+
+      async function drawShipment(outputPdf, outputPage, shipment, columnX, columnWidth, font) {
+        const sourceHeight = shipment.sourcePage.getHeight();
+        const availableHeight = A4_HEIGHT - DOUBLE_TOP_MARGIN - TEXT_GAP - TEXT_HEIGHT - 8;
+        const scale = Math.min(DOUBLE_SCALE, columnWidth / CROP_RIGHT, availableHeight / sourceHeight);
+        const labelWidth = CROP_RIGHT * scale;
+        const labelHeight = sourceHeight * scale;
+        const x = columnX + Math.max((columnWidth - labelWidth) / 2, 0);
+        const y = A4_HEIGHT - DOUBLE_TOP_MARGIN - labelHeight;
+
+        const embeddedPage = await outputPdf.embedPage(shipment.sourcePage, {
+          left: CROP_LEFT,
+          bottom: CROP_BOTTOM,
+          right: CROP_RIGHT,
+          top: sourceHeight,
+        });
+
+        outputPage.drawPage(embeddedPage, {
+          x,
+          y,
+          width: labelWidth,
+          height: labelHeight,
+        });
+
+        drawWrappedText(
+          outputPage,
+          `Producto: ${shipment.producto}\nCantidad: ${shipment.cantidad}`,
+          columnX,
+          y - TEXT_GAP - TEXT_SIZE,
+          columnWidth,
+          font,
+        );
+      }
+
+      async function extractPageText(bytes, pageNumber) {
+        const loadingTask = pdfjs.getDocument({ data: bytes.slice(0) });
+        const pdf = await loadingTask.promise;
+        const page = await pdf.getPage(pageNumber);
+        const content = await page.getTextContent();
+        return content.items.map((item) => item.str).join("\n");
+      }
+
+      function extractProductData(text) {
+        const lines = text
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+
+        const cantidadLine = lines.find((line) => line.toLowerCase().startsWith("cantidad:"));
+        const cantidad = cantidadLine ? cantidadLine.split(":").slice(1).join(":").trim() : "No encontrada";
+
+        let producto = "";
+        const markerIndex = text.indexOf(PRODUCT_MARKER);
+        if (markerIndex >= 0) {
+          const afterMarker = text.slice(markerIndex + PRODUCT_MARKER.length);
+          producto = afterMarker
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .find(Boolean) || "";
+        }
+
+        if (!producto) {
+          producto = lastUsefulLine(lines) || "No encontrado";
+        }
+
+        return { producto, cantidad };
+      }
+
+      function lastUsefulLine(lines) {
+        const ignored = [
+          /^identifi/i,
+          /^producto$/i,
+          /^pack id:/i,
+          /^venta:/i,
+          /^sku:/i,
+          /^cantidad:/i,
+          /^tipo de envase:/i,
+        ];
+
+        for (let index = lines.length - 1; index >= 0; index -= 1) {
+          if (!ignored.some((pattern) => pattern.test(lines[index]))) {
+            return lines[index];
+          }
+        }
+
+        return "";
+      }
+
+      function drawWrappedText(page, text, x, y, width, font) {
+        const lines = [];
+        for (const paragraph of text.split("\n")) {
+          let current = "";
+          for (const word of paragraph.split(/\s+/)) {
+            const candidate = current ? `${current} ${word}` : word;
+            if (font.widthOfTextAtSize(candidate, TEXT_SIZE) <= width || !current) {
+              current = candidate;
+            } else {
+              lines.push(current);
+              current = word;
+            }
+          }
+          if (current) lines.push(current);
+        }
+
+        lines.slice(0, 5).forEach((line, index) => {
+          page.drawText(line, {
+            x,
+            y: y - index * (TEXT_SIZE + 2),
+            size: TEXT_SIZE,
+            font,
+            color: PDFLib.rgb(0, 0, 0),
+          });
+        });
+      }
+
+      function addResult(container, outputName, bytes) {
+        const blob = new Blob([bytes], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        const download = document.createElement("a");
+        download.className = "download";
+        download.href = url;
+        download.download = outputName;
+        download.textContent = `Descargar ${outputName}`;
+        container.appendChild(download);
+
+        const file = new File([blob], outputName, { type: "application/pdf" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          const shareButton = document.createElement("button");
+          shareButton.type = "button";
+          shareButton.className = "secondary";
+          shareButton.textContent = "Compartir / imprimir";
+          shareButton.addEventListener("click", async () => {
+            await navigator.share({ files: [file], title: outputName });
+          });
+          container.appendChild(shareButton);
+        }
+      }
+
+      function baseName(name) {
+        return name.toLowerCase().endsWith(".pdf") ? name.slice(0, -4) : name;
+      }
+
+      function numberValue(selector, fallback) {
+        const value = Number(document.querySelector(selector).value);
+        return Number.isFinite(value) ? value : fallback;
+      }
+
+      function setBusy(selector, busy) {
+        document.querySelector(selector).disabled = busy;
+      }
+
+      function readCounter(key) {
+        const value = Number(localStorage.getItem(key) || "1");
+        return Number.isFinite(value) && value > 0 ? value : 1;
+      }
+
+      function writeCounter(key, value) {
+        localStorage.setItem(key, String(value));
+      }
+    </script>
+  </body>
+</html>
