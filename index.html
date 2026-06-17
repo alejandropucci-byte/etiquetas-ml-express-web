@@ -92,7 +92,8 @@
       }
 
       input[type="file"],
-      input[type="number"] {
+      input[type="number"],
+      select {
         width: 100%;
         min-height: 44px;
         margin-top: 7px;
@@ -153,16 +154,26 @@
 
       <section id="modeSimple" class="mode">
         <h2>Preparar 1 etiqueta</h2>
-        <p class="hint">Genera A4 horizontal con la etiqueta al lado izquierdo.</p>
+        <p class="hint">Genera A4 horizontal y permite elegir el lado fisico de impresion.</p>
 
         <label for="simplePdf">PDF de Mercado Libre</label>
         <input id="simplePdf" type="file" accept="application/pdf,.pdf" />
 
         <div class="grid">
           <label>
+            Ubicacion
+            <select id="simplePosition">
+              <option value="left">Izquierda</option>
+              <option value="right">Derecha</option>
+            </select>
+          </label>
+          <label>
             Margen izquierdo
             <input id="simpleLeftMargin" type="number" min="0" step="1" value="20" />
           </label>
+        </div>
+
+        <div class="grid">
           <label>
             Margen superior
             <input id="simpleTopMargin" type="number" min="0" step="1" value="20" />
@@ -249,8 +260,10 @@
         status.textContent = "Procesando...";
 
         try {
-          const bytes = await prepareSimplePdf(file);
-          const outputName = `${simpleCounter}-izquierda_${baseName(file.name)}.pdf`;
+          const position = document.querySelector("#simplePosition").value;
+          const bytes = await prepareSimplePdf(file, position);
+          const sideName = position === "right" ? "derecha" : "izquierda";
+          const outputName = `${simpleCounter}-${sideName}_${baseName(file.name)}.pdf`;
           simpleCounter += 1;
           writeCounter("simpleCounter", simpleCounter);
           addResult(result, outputName, bytes);
@@ -291,7 +304,7 @@
         }
       }
 
-      async function prepareSimplePdf(file) {
+      async function prepareSimplePdf(file, position) {
         const leftMargin = numberValue("#simpleLeftMargin", 20);
         const topMargin = numberValue("#simpleTopMargin", 20);
         const sourceBytes = await file.arrayBuffer();
@@ -313,11 +326,15 @@
           top: cropTop,
         });
 
+        const labelWidth = CROP_RIGHT * SIMPLE_SCALE;
+        const labelHeight = cropTop * SIMPLE_SCALE;
+        const x = position === "right" ? A4_WIDTH - leftMargin - labelWidth : leftMargin;
+
         outputPage.drawPage(embeddedPage, {
-          x: leftMargin,
-          y: A4_HEIGHT - topMargin - cropTop * SIMPLE_SCALE,
-          width: CROP_RIGHT * SIMPLE_SCALE,
-          height: cropTop * SIMPLE_SCALE,
+          x,
+          y: A4_HEIGHT - topMargin - labelHeight,
+          width: labelWidth,
+          height: labelHeight,
         });
 
         return outputPdf.save();

@@ -4,7 +4,7 @@ Version web estatica para usar desde celular y publicar en GitHub Pages.
 
 ## Que hace
 
-- Modo 1: prepara 1 etiqueta en A4 horizontal con la etiqueta al lado izquierdo.
+- Modo 1: prepara 1 etiqueta en A4 horizontal y permite elegir izquierda o derecha.
 - Modo 2: junta 2 envios en una hoja A4 horizontal, con producto y cantidad debajo de cada etiqueta.
 
 Los PDFs se procesan en el navegador. No se suben a un servidor propio.
